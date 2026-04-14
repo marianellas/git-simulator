@@ -1,121 +1,177 @@
-import { useState } from 'react'
-import reactLogo from './assets/react.svg'
-import viteLogo from './assets/vite.svg'
-import heroImg from './assets/hero.png'
-import './App.css'
+import { useCallback, useRef, useState } from 'react';
+import { Header } from './components/Header';
+import { Terminal } from './components/Terminal/Terminal';
+import { GraphPanel } from './components/Graph/GraphPanel';
+import { FileEditor } from './components/FileEditor/FileEditor';
+import { InternalsPanel } from './components/Internals/InternalsPanel';
 
-function App() {
-  const [count, setCount] = useState(0)
+const PANEL_BORDER = '1px solid #1e293b';
+const MIN_WIDTH = 180;
+const MAX_TERMINAL_WIDTH = 700;
 
+function PanelLabel({ children }: { children: React.ReactNode }) {
   return (
-    <>
-      <section id="center">
-        <div className="hero">
-          <img src={heroImg} className="base" width="170" height="179" alt="" />
-          <img src={reactLogo} className="framework" alt="React logo" />
-          <img src={viteLogo} className="vite" alt="Vite logo" />
-        </div>
-        <div>
-          <h1>Get started</h1>
-          <p>
-            Edit <code>src/App.tsx</code> and save to test <code>HMR</code>
-          </p>
-        </div>
-        <button
-          className="counter"
-          onClick={() => setCount((count) => count + 1)}
-        >
-          Count is {count}
-        </button>
-      </section>
-
-      <div className="ticks"></div>
-
-      <section id="next-steps">
-        <div id="docs">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#documentation-icon"></use>
-          </svg>
-          <h2>Documentation</h2>
-          <p>Your questions, answered</p>
-          <ul>
-            <li>
-              <a href="https://vite.dev/" target="_blank">
-                <img className="logo" src={viteLogo} alt="" />
-                Explore Vite
-              </a>
-            </li>
-            <li>
-              <a href="https://react.dev/" target="_blank">
-                <img className="button-icon" src={reactLogo} alt="" />
-                Learn more
-              </a>
-            </li>
-          </ul>
-        </div>
-        <div id="social">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#social-icon"></use>
-          </svg>
-          <h2>Connect with us</h2>
-          <p>Join the Vite community</p>
-          <ul>
-            <li>
-              <a href="https://github.com/vitejs/vite" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#github-icon"></use>
-                </svg>
-                GitHub
-              </a>
-            </li>
-            <li>
-              <a href="https://chat.vite.dev/" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#discord-icon"></use>
-                </svg>
-                Discord
-              </a>
-            </li>
-            <li>
-              <a href="https://x.com/vite_js" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#x-icon"></use>
-                </svg>
-                X.com
-              </a>
-            </li>
-            <li>
-              <a href="https://bsky.app/profile/vite.dev" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#bluesky-icon"></use>
-                </svg>
-                Bluesky
-              </a>
-            </li>
-          </ul>
-        </div>
-      </section>
-
-      <div className="ticks"></div>
-      <section id="spacer"></section>
-    </>
-  )
+    <div
+      style={{
+        padding: '0.4rem 0.75rem',
+        borderBottom: PANEL_BORDER,
+        fontSize: '12px',
+        color: '#64748b',
+        textTransform: 'uppercase',
+        letterSpacing: '0.05em',
+        background: '#0f172a',
+        flexShrink: 0,
+      }}
+    >
+      {children}
+    </div>
+  );
 }
 
-export default App
+function ResizeHandle({ onDrag }: { onDrag: (dx: number) => void }) {
+  const dragging = useRef(false);
+  const lastX = useRef(0);
+
+  const onMouseDown = useCallback((e: React.MouseEvent) => {
+    dragging.current = true;
+    lastX.current = e.clientX;
+    document.body.style.cursor = 'col-resize';
+    document.body.style.userSelect = 'none';
+
+    const onMouseMove = (e: MouseEvent) => {
+      if (!dragging.current) return;
+      onDrag(e.clientX - lastX.current);
+      lastX.current = e.clientX;
+    };
+
+    const onMouseUp = () => {
+      dragging.current = false;
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+      window.removeEventListener('mousemove', onMouseMove);
+      window.removeEventListener('mouseup', onMouseUp);
+    };
+
+    window.addEventListener('mousemove', onMouseMove);
+    window.addEventListener('mouseup', onMouseUp);
+  }, [onDrag]);
+
+  return (
+    <div
+      onMouseDown={onMouseDown}
+      style={{
+        width: '4px',
+        flexShrink: 0,
+        background: 'transparent',
+        borderRight: PANEL_BORDER,
+        cursor: 'col-resize',
+        transition: 'background 0.15s',
+      }}
+      onMouseEnter={(e) => (e.currentTarget.style.background = '#3b82f6')}
+      onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
+    />
+  );
+}
+
+function App() {
+  const [terminalWidth, setTerminalWidth] = useState(340);
+  const [graphOpen, setGraphOpen] = useState(true);
+
+  const handleTerminalResize = useCallback((dx: number) => {
+    setTerminalWidth((w) => Math.min(MAX_TERMINAL_WIDTH, Math.max(MIN_WIDTH, w + dx)));
+  }, []);
+
+  return (
+    <div
+      style={{
+        height: '100vh',
+        display: 'flex',
+        flexDirection: 'column',
+        background: '#0a0f1a',
+        overflow: 'hidden',
+      }}
+    >
+      <Header />
+
+      <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
+
+        {/* Left — Terminal */}
+        <div
+          style={{
+            width: terminalWidth,
+            flexShrink: 0,
+            display: 'flex',
+            flexDirection: 'column',
+            overflow: 'hidden',
+          }}
+        >
+          <PanelLabel>Terminal</PanelLabel>
+          <div style={{ flex: 1, overflow: 'hidden' }}>
+            <Terminal />
+          </div>
+        </div>
+
+        <ResizeHandle onDrag={handleTerminalResize} />
+
+        {/* Middle — Commit Graph */}
+        <div
+          style={{
+            width: graphOpen ? 220 : 28,
+            flexShrink: 0,
+            borderRight: PANEL_BORDER,
+            display: 'flex',
+            flexDirection: 'column',
+            overflow: 'hidden',
+            transition: 'width 0.2s ease',
+          }}
+        >
+          <GraphPanel open={graphOpen} onToggle={() => setGraphOpen((v) => !v)} />
+        </div>
+
+        {/* Right — Working Directory + Internals */}
+        <div
+          style={{
+            flex: 1,
+            display: 'flex',
+            flexDirection: 'column',
+            overflow: 'hidden',
+          }}
+        >
+          {/* Working Directory */}
+          <div
+            style={{
+              flex: '0 0 45%',
+              borderBottom: PANEL_BORDER,
+              display: 'flex',
+              flexDirection: 'column',
+              overflow: 'hidden',
+            }}
+          >
+            <PanelLabel>Working Directory</PanelLabel>
+            <div style={{ flex: 1, overflow: 'hidden' }}>
+              <FileEditor />
+            </div>
+          </div>
+
+          {/* Internals */}
+          <div
+            style={{
+              flex: 1,
+              display: 'flex',
+              flexDirection: 'column',
+              overflow: 'hidden',
+            }}
+          >
+            <PanelLabel>Internals</PanelLabel>
+            <div style={{ flex: 1, overflow: 'hidden' }}>
+              <InternalsPanel />
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  );
+}
+
+export default App;
